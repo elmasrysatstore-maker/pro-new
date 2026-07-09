@@ -5,12 +5,13 @@ from tkinter import messagebox, ttk
 from datetime import datetime
 import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from tkcalendar import DateEntry
 
 # ==================== إعدادات عامة ====================
 MASTER_FILE = "الملف_الرئيسي_المحاسبي.xlsx"
 EXCLUDED_FILES = {"~$", MASTER_FILE}
 WINDOW_WIDTH = 700
-WINDOW_HEIGHT = 450
+WINDOW_HEIGHT = 500
 
 # ألوان الواجهة
 COLORS = {
@@ -134,7 +135,7 @@ def validate_inputs():
             "qty": qty,
             "price": price,
             "total": qty * price,
-            "date": ent_date.get().strip() or datetime.now().strftime('%Y-%m-%d')
+            "date": date_picker.get_date().strftime('%Y-%m-%d')
         }
     except ValueError:
         messagebox.showerror("خطأ", "الكمية والسعر يجب أن تكون أرقاماً صحيحة!")
@@ -170,12 +171,11 @@ def save_data():
         combo_customer.set(data['customer'])
         load_customer_data()
         
-        # ��حديث قائمة الأصناف
+        # تحديث قائمة الأصناف
         update_item_types_list()
         
-        # تجديد التاريخ فقط
-        ent_date.delete(0, tk.END)
-        ent_date.insert(0, datetime.now().strftime('%Y-%m-%d'))
+        # تجديد الحقول
+        clear_inputs()
         
     except PermissionError:
         messagebox.showerror("خطأ", "الملف قيد الاستخدام! أغلق الملف أولاً.")
@@ -187,8 +187,7 @@ def clear_inputs():
     combo_type.set("")
     ent_qty.delete(0, tk.END)
     ent_price.delete(0, tk.END)
-    ent_date.delete(0, tk.END)
-    ent_date.insert(0, datetime.now().strftime('%Y-%m-%d'))
+    date_picker.set_date(datetime.now())
 
 def update_item_types_list():
     """تحديث قائمة أنواع الأصناف"""
@@ -289,7 +288,7 @@ def generate_master_file():
 # ==================== بناء الواجهة ====================
 
 root = tk.Tk()
-root.title("النظام المحاسبي الذكي - v2.3")
+root.title("النظام المحاسبي الذكي - v2.5")
 root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 root.configure(bg=COLORS["bg"])
 root.resizable(True, True)
@@ -327,7 +326,7 @@ combo_customer.pack(side="right", padx=3, fill="x", expand=True)
 combo_customer.bind("<<ComboboxSelected>>", load_customer_data)
 combo_customer.bind("<Return>", load_customer_data)
 
-# === إطار المدخلات ===
+# === إطار المدخلات المدمج ===
 frame_inputs = tk.LabelFrame(
     root,
     text="إضافة صنف جديد",
@@ -339,30 +338,43 @@ frame_inputs = tk.LabelFrame(
 )
 frame_inputs.pack(fill="x", padx=10, pady=3)
 
-# الصف الأول (الصنف والكمية)
+# الصف الأول (الصنف والكمية والسعر)
 frame_row1 = tk.Frame(frame_inputs, bg=COLORS["bg"])
-frame_row1.pack(fill="x", pady=3)
+frame_row1.pack(fill="x", pady=2)
 
-tk.Label(frame_row1, text="الصنف:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
-combo_type = ttk.Combobox(frame_row1, font=("Cairo", 10), justify="right", width=14, state="normal")
-combo_type.pack(side="right", padx=3, fill="x", expand=True)
+# الصنف
+tk.Label(frame_row1, text="الصنف:", font=("Cairo", 9), bg=COLORS["bg"], width=6).pack(side="right", padx=2)
+combo_type = ttk.Combobox(frame_row1, font=("Cairo", 9), justify="right", width=12, state="normal")
+combo_type.pack(side="right", padx=2, fill="x", expand=False)
 
-tk.Label(frame_row1, text="الكمية:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
-ent_qty = tk.Entry(frame_row1, font=("Cairo", 10), justify="right", width=12)
-ent_qty.pack(side="right", padx=3)
+# الكمية
+tk.Label(frame_row1, text="الكمية:", font=("Cairo", 9), bg=COLORS["bg"], width=6).pack(side="right", padx=2)
+ent_qty = tk.Entry(frame_row1, font=("Cairo", 9), justify="right", width=10)
+ent_qty.pack(side="right", padx=2)
 
-# الصف الثاني (السعر والتاريخ)
+# السعر
+tk.Label(frame_row1, text="السعر:", font=("Cairo", 9), bg=COLORS["bg"], width=6).pack(side="right", padx=2)
+ent_price = tk.Entry(frame_row1, font=("Cairo", 9), justify="right", width=10)
+ent_price.pack(side="right", padx=2)
+
+# الصف الثاني (التاريخ على اليسار)
 frame_row2 = tk.Frame(frame_inputs, bg=COLORS["bg"])
-frame_row2.pack(fill="x", pady=3)
+frame_row2.pack(fill="x", pady=2)
 
-tk.Label(frame_row2, text="السعر:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
-ent_price = tk.Entry(frame_row2, font=("Cairo", 10), justify="right", width=14)
-ent_price.pack(side="right", padx=3, fill="x", expand=True)
-
-tk.Label(frame_row2, text="التاريخ:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
-ent_date = tk.Entry(frame_row2, font=("Cairo", 10), justify="right", width=12)
-ent_date.insert(0, datetime.now().strftime('%Y-%m-%d'))
-ent_date.pack(side="right", padx=3)
+# تقويم التاريخ على اليسار
+tk.Label(frame_row2, text="التاريخ:", font=("Cairo", 9), bg=COLORS["bg"], width=6).pack(side="left", padx=2)
+date_picker = DateEntry(
+    frame_row2,
+    font=("Cairo", 9),
+    width=12,
+    background="darkblue",
+    foreground="white",
+    borderwidth=2,
+    year=datetime.now().year,
+    month=datetime.now().month,
+    day=datetime.now().day
+)
+date_picker.pack(side="left", padx=2)
 
 # === أزرار العمليات ===
 frame_buttons = tk.Frame(root, bg=COLORS["bg"])

@@ -5,6 +5,7 @@ from tkinter import messagebox, ttk
 from datetime import datetime
 import pandas as pd
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+import re
 
 # ==================== إعدادات عامة ====================
 MASTER_FILE = "الملف_الرئيسي_المحاسبي.xlsx"
@@ -60,6 +61,66 @@ def get_all_item_types():
     except Exception as e:
         return []
 
+def is_arabic(text):
+    """التحقق من أن النص يحتوي على أحرف عربية فقط (مع المسافات)"""
+    if not text:
+        return False
+    # السماح بالأحرف العربية والمسافات فقط
+    arabic_pattern = re.compile(r'^[\u0600-\u06FF\s]+$')
+    return arabic_pattern.match(text) is not None
+
+def on_customer_keyrelease(event):
+    """فتح القائمة المنسدلة عند كتابة اسم العميل"""
+    text = combo_customer.get()
+    
+    # التحقق من الأحرف العربية
+    if text and not is_arabic(text):
+        combo_customer.delete(len(text) - 1, tk.END)
+        return
+    
+    if text:
+        # الحصول على قائمة العملاء المتطابقة
+        customers = update_customer_list()
+        matching = [c for c in customers if c.startswith(text)]
+        combo_customer['values'] = matching if matching else customers
+        combo_customer.event_generate('<Down>')  # فتح القائمة
+    else:
+        combo_customer['values'] = update_customer_list()
+
+def on_type_keyrelease(event):
+    """فتح القائمة المنسدلة عند كتابة نوع الصنف"""
+    text = combo_type.get()
+    
+    # التحقق من الأحرف العربية
+    if text and not is_arabic(text):
+        combo_type.delete(len(text) - 1, tk.END)
+        return
+    
+    if text:
+        # الحصول على قائمة الأصناف المتطابقة
+        item_types = get_all_item_types()
+        matching = [t for t in item_types if t.startswith(text)]
+        combo_type['values'] = matching if matching else item_types
+        combo_type.event_generate('<Down>')  # فتح القائمة
+    else:
+        combo_type['values'] = get_all_item_types()
+
+def on_qty_entry(event):
+    """السماح بالأرقام فقط في حقل الكمية"""
+    text = ent_qty.get()
+    # السماح بالأرقام والفاصلة العشرية
+    if text and not re.match(r'^[\d.]*$', text):
+        ent_qty.delete(0, tk.END)
+        ent_qty.insert(0, re.sub(r'[^\d.]', '', text))
+
+def on_price_entry(event):
+    """السماح بالأرقام فقط في حقل السعر"""
+    text = ent_price.get()
+    # السماح بالأرقام والفاصلة العشرية
+    if text and not re.match(r'^[\d.]*$', text):
+        ent_price.delete(0, tk.END)
+        ent_price.insert(0, re.sub(r'[^\d.]', '', text))
+
 def load_customer_data(event=None):
     """قراءة وعرض بيانات العميل في الجدول"""
     customer = combo_customer.get().strip()
@@ -98,7 +159,7 @@ def load_customer_data(event=None):
             text=f"الحالة: {count} عملية | الإجمالي: {total:,.2f}"
         )
     except Exception as e:
-        messagebox.showerror("خطأ", f"فشل قر��ءة الملف: {e}")
+        messagebox.showerror("خطأ", f"فشل قراءة الملف: {e}")
         lbl_status.config(text="الحالة: خطأ في القراءة")
 
 def validate_inputs():
@@ -112,8 +173,16 @@ def validate_inputs():
         messagebox.showwarning("تحذير", "الرجاء اختيار اسم عميل!")
         return None
     
+    if not is_arabic(customer):
+        messagebox.showwarning("تحذير", "اسم العميل يجب أن يكون بالعربية فقط!")
+        return None
+    
     if not item_type:
         messagebox.showwarning("تحذير", "الرجاء اختيار نوع الصنف!")
+        return None
+    
+    if not is_arabic(item_type):
+        messagebox.showwarning("تحذير", "نوع الصنف يجب أن يكون بالعربية فقط!")
         return None
     
     if not qty_str or not price_str:
@@ -286,10 +355,10 @@ def generate_master_file():
     except Exception as e:
         messagebox.showerror("خطأ", f"فشل إنشاء الملف الرئيسي: {e}")
 
-# ==================== بناء الوا��هة ====================
+# ==================== بناء الواجهة ====================
 
 root = tk.Tk()
-root.title("النظام المحاسبي الذكي - v2.3")
+root.title("النظام المحاسبي الذكي - v2.4")
 root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
 root.configure(bg=COLORS["bg"])
 root.resizable(True, True)
@@ -326,11 +395,12 @@ combo_customer = ttk.Combobox(
 combo_customer.pack(side="right", padx=3, fill="x", expand=True)
 combo_customer.bind("<<ComboboxSelected>>", load_customer_data)
 combo_customer.bind("<Return>", load_customer_data)
+combo_customer.bind("<KeyRelease>", on_customer_keyrelease)
 
 # === إطار المدخلات ===
 frame_inputs = tk.LabelFrame(
     root,
-    text="إضافة صنف ��ديد",
+    text="إضافة صنف جديد",
     font=("Cairo", 10, "bold"),
     bg=COLORS["bg"],
     fg=COLORS["primary"],
@@ -346,10 +416,12 @@ frame_row1.pack(fill="x", pady=3)
 tk.Label(frame_row1, text="الصنف:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
 combo_type = ttk.Combobox(frame_row1, font=("Cairo", 10), justify="right", width=14, state="normal")
 combo_type.pack(side="right", padx=3, fill="x", expand=True)
+combo_type.bind("<KeyRelease>", on_type_keyrelease)
 
 tk.Label(frame_row1, text="الكمية:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
 ent_qty = tk.Entry(frame_row1, font=("Cairo", 10), justify="right", width=12)
 ent_qty.pack(side="right", padx=3)
+ent_qty.bind("<KeyRelease>", on_qty_entry)
 
 # الصف الثاني (السعر والتاريخ)
 frame_row2 = tk.Frame(frame_inputs, bg=COLORS["bg"])
@@ -358,6 +430,7 @@ frame_row2.pack(fill="x", pady=3)
 tk.Label(frame_row2, text="السعر:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
 ent_price = tk.Entry(frame_row2, font=("Cairo", 10), justify="right", width=14)
 ent_price.pack(side="right", padx=3, fill="x", expand=True)
+ent_price.bind("<KeyRelease>", on_price_entry)
 
 tk.Label(frame_row2, text="التاريخ:", font=("Cairo", 10), bg=COLORS["bg"]).pack(side="right", padx=3)
 ent_date = tk.Entry(frame_row2, font=("Cairo", 10), justify="right", width=12)
